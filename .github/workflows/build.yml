@@ -19,18 +19,17 @@ jobs:
         with:
           gradle-version: 8.9
 
-      - name: Create project
-        run: |
-          mkdir -p app/src/main/java/com/example/dash app/src/main/res/drawable
-          
-          # Копируем вашу картинку машины из корня репозитория в ресурсы Android
-          if [ -f car.jpg ]; then
-            cp car.jpg app/src/main/res/drawable/car.jpg
-          fi
-
-          # Создание MainActivity.kt
-          cat > app/src/main/java/com/example/dash/MainActivity.kt <<'EOT'
-          package com.example.dash
+      - - name: Create project
+  run: |
+    mkdir -p app/src/main/java/com/example/dash app/src/main/res/drawable
+    
+    # Эта строка возьмет ваш car.jpg из корня репозитория и положит куда надо
+    cp car.jpg app/src/main/res/drawable/car.jpg
+    
+    # Дальше идет создание MainActivity.kt
+    cat > app/src/main/java/com/example/dash/MainActivity.kt <<'EOT'
+    ... (весь остальной код Kotlin оставляем без изменений) ...
+      
 
           import android.Manifest
           import android.app.Activity
