@@ -21,8 +21,13 @@ jobs:
 
       - name: Create project
         run: |
-          mkdir -p app/src/main/java/com/example/dash
+          mkdir -p app/src/main/java/com/example/dash app/src/main/res/drawable
           
+          # Копируем картинку машины из корня репозитория в ресурсы Android
+          if [ -f car.jpg ]; then
+            cp car.jpg app/src/main/res/drawable/car.jpg
+          fi
+
           # Создание MainActivity.kt
           cat > app/src/main/java/com/example/dash/MainActivity.kt <<'EOT'
           package com.example.dash
@@ -415,6 +420,20 @@ jobs:
               private val coolCols = arrayOf("#1EA0FF", "#27B6FF", "#4CC9FF", "#7FDCFF", "#FF8A2A", "#FF3B2A").map { Color.parseColor(it) }.toIntArray()
               private val unlit = Color.argb(72, 70, 110, 150)
 
+              // Загрузка картинки машины с защитой от ошибок
+              private val car: Bitmap? by lazy {
+                  try {
+                      val src = BitmapFactory.decodeResource(resources, R.drawable.car, BitmapFactory.Options().apply { inScaled = false })
+                      val out = Bitmap.createBitmap(src.width, src.height, Bitmap.Config.ARGB_8888)
+                      val cc = Canvas(out); cc.drawBitmap(src, 0f, 0f, null)
+                      val mp = Paint(); mp.xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN)
+                      mp.shader = RadialGradient(0f, 0f, 1f, intArrayOf(Color.BLACK, Color.BLACK, Color.TRANSPARENT), floatArrayOf(0f, .68f, 1f), Shader.TileMode.CLAMP)
+                      cc.save(); cc.translate(src.width / 2f, src.height / 2f); cc.scale(src.width / 2f, src.height / 2f)
+                      cc.drawRect(-1f, -1f, 1f, 1f, mp); cc.restore()
+                      out
+                  } catch (e: Exception) { null }
+              }
+
               private var staticBmp: Bitmap? = null
               private var sc = 1f; private var ox = 0f; private var oy = 0f
               private var t0 = 0L
@@ -501,7 +520,9 @@ jobs:
                   }
                   c.drawRoundRect(0f, 0f, DW, DH, 34f, 34f, bg)
                   dialStatic(c, spd); dialStatic(c, rpmD)
+                  car?.let { c.drawBitmap(it, 560f, 215f, null) }
 
+                  // верхняя плашка
                   val pl = pt(Color.argb(140, 39, 182, 255), 2f); pl.setShadowLayer(10f, 0f, 0f, cCy)
                   path.reset(); path.moveTo(527f, 128f); path.lineTo(527f, 150f); path.quadTo(540f, 184f, 575f, 184f)
                   path.lineTo(1340f, 184f); path.quadTo(1378f, 184f, 1390f, 150f); path.lineTo(1390f, 128f)
@@ -509,11 +530,13 @@ jobs:
                   path.reset(); path.moveTo(722f, 180f); path.lineTo(742f, 158f); path.lineTo(818f, 158f); c.drawPath(path, pl)
                   path.reset(); path.moveTo(1100f, 158f); path.lineTo(1170f, 158f); path.lineTo(1195f, 180f); c.drawPath(path, pl)
 
+                  // правая панель
                   c.drawRoundRect(1170f, 242f, 1422f, 533f, 18f, 18f, pt(Color.argb(199, 10, 22, 36)).also { it.style = Paint.Style.FILL })
                   c.drawRoundRect(1170f, 242f, 1422f, 533f, 18f, 18f, pt(Color.argb(115, 39, 182, 255), 2f))
                   for (y in floatArrayOf(335f, 434f)) c.drawLine(1182f, y, 1410f, y, pt(Color.argb(64, 39, 182, 255), 1.5f))
                   icoTherm(c, 1212f, 282f, cLabel); icoGauge(c, 1212f, 384f); icoGauge(c, 1212f, 484f)
 
+                  // нижняя панель
                   c.drawRoundRect(70f, 582f, 1850f, 680f, 44f, 44f, pt(Color.argb(235, 8, 16, 28)).also { it.style = Paint.Style.FILL })
                   val tl = pt(Color.WHITE, 2f)
                   tl.shader = LinearGradient(70f, 0f, 1850f, 0f, intArrayOf(Color.argb(0, 39, 182, 255), Color.argb(204, 39, 182, 255), Color.argb(0, 39, 182, 255)), null, Shader.TileMode.CLAMP)
