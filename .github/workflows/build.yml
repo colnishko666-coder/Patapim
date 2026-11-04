@@ -324,7 +324,7 @@ jobs:
               private val coolCols = arrayOf("#1EA0FF", "#27B6FF", "#4CC9FF", "#7FDCFF", "#FF8A2A", "#FF3B2A").map { Color.parseColor(it) }.toIntArray()
               private val unlit = Color.argb(72, 70, 110, 150)
 
-              // Тут грузим картинку
+              // Картинка машины
               private val car: Bitmap? by lazy {
                   try {
                       val src = BitmapFactory.decodeResource(resources, R.drawable.car, BitmapFactory.Options().apply { inScaled = false })
@@ -412,7 +412,15 @@ jobs:
                   val bg = pt(Color.WHITE).also { it.shader = RadialGradient(DW / 2, DH * .45f, DW * .62f, Color.parseColor("#0D1B2A"), Color.parseColor("#04070C"), Shader.TileMode.CLAMP) }
                   c.drawRoundRect(0f, 0f, DW, DH, 34f, 34f, bg)
                   dialStatic(c, spd); dialStatic(c, rpmD)
-                  car?.let { c.drawBitmap(it, 650f, 240f, null) } // Выводим машину
+                  
+                  // Выводим машину строго по центру доступной зоны
+                  car?.let { 
+                      val x = (DW - it.width) / 2f
+                      val topLimit = 184f
+                      val bottomLimit = 582f
+                      val y = topLimit + (bottomLimit - topLimit - it.height) / 2f
+                      c.drawBitmap(it, x, y, null) 
+                  }
 
                   val pl = pt(Color.argb(140, 39, 182, 255), 2f); pl.setShadowLayer(10f, 0f, 0f, cCy)
                   path.reset(); path.moveTo(527f, 128f); path.lineTo(527f, 150f); path.quadTo(540f, 184f, 575f, 184f); path.lineTo(1340f, 184f); path.quadTo(1378f, 184f, 1390f, 150f); path.lineTo(1390f, 128f)
