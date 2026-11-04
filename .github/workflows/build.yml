@@ -23,7 +23,7 @@ jobs:
         run: |
           mkdir -p app/src/main/java/com/example/dash app/src/main/res/drawable
           
-          # Копируем картинку машины из корня репозитория в ресурсы Android
+          # Копируем вашу картинку машины из корня репозитория в ресурсы Android
           if [ -f car.jpg ]; then
             cp car.jpg app/src/main/res/drawable/car.jpg
           fi
@@ -420,14 +420,14 @@ jobs:
               private val coolCols = arrayOf("#1EA0FF", "#27B6FF", "#4CC9FF", "#7FDCFF", "#FF8A2A", "#FF3B2A").map { Color.parseColor(it) }.toIntArray()
               private val unlit = Color.argb(72, 70, 110, 150)
 
-              // Загрузка картинки машины с защитой от ошибок
+              // Загрузка картинки машины с красивым растворением краев
               private val car: Bitmap? by lazy {
                   try {
                       val src = BitmapFactory.decodeResource(resources, R.drawable.car, BitmapFactory.Options().apply { inScaled = false })
                       val out = Bitmap.createBitmap(src.width, src.height, Bitmap.Config.ARGB_8888)
                       val cc = Canvas(out); cc.drawBitmap(src, 0f, 0f, null)
                       val mp = Paint(); mp.xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN)
-                      mp.shader = RadialGradient(0f, 0f, 1f, intArrayOf(Color.BLACK, Color.BLACK, Color.TRANSPARENT), floatArrayOf(0f, .68f, 1f), Shader.TileMode.CLAMP)
+                      mp.shader = RadialGradient(0f, 0f, 1f, intArrayOf(Color.BLACK, Color.BLACK, Color.TRANSPARENT), floatArrayOf(0f, .75f, 1f), Shader.TileMode.CLAMP)
                       cc.save(); cc.translate(src.width / 2f, src.height / 2f); cc.scale(src.width / 2f, src.height / 2f)
                       cc.drawRect(-1f, -1f, 1f, 1f, mp); cc.restore()
                       out
@@ -520,7 +520,9 @@ jobs:
                   }
                   c.drawRoundRect(0f, 0f, DW, DH, 34f, 34f, bg)
                   dialStatic(c, spd); dialStatic(c, rpmD)
-                  car?.let { c.drawBitmap(it, 560f, 215f, null) }
+                  
+                  // Рисуем машину по центру (координаты подобраны под вашу картинку)
+                  car?.let { c.drawBitmap(it, 650f, 240f, null) }
 
                   // верхняя плашка
                   val pl = pt(Color.argb(140, 39, 182, 255), 2f); pl.setShadowLayer(10f, 0f, 0f, cCy)
