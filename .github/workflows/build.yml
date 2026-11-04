@@ -19,17 +19,21 @@ jobs:
         with:
           gradle-version: 8.9
 
-      - - name: Create project
-  run: |
-    mkdir -p app/src/main/java/com/example/dash app/src/main/res/drawable
-    
-    # Эта строка возьмет ваш car.jpg из корня репозитория и положит куда надо
-    cp car.jpg app/src/main/res/drawable/car.jpg
-    
-    # Дальше идет создание MainActivity.kt
-    cat > app/src/main/java/com/example/dash/MainActivity.kt <<'EOT'
-    ... (весь остальной код Kotlin оставляем без изменений) ...
-      
+      - name: Create project
+        run: |
+          mkdir -p app/src/main/java/com/example/dash app/src/main/res/drawable
+          
+          # Восстанавливаем картинку машины из встроенного base64 прямо в проект
+          cat > app/src/main/res/drawable/car.jpg <<'EOT'
+          /9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAA0JCgsKCA0LCgsODg0PEyAVExISEyccHhcgLikxMC4pLSwzOko+MzZGNywtQFdBRkxOUlNSMj5aYVpQYEpRUk//2wBDAQ4ODhMREyYVFSZPNS01T09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT0//wAARCAFyAnYDASIAAhEBAxEB/8QAGwAAAgMBAQEAAAAAAAAAAAAAAAECAwQFBgf/xABREAABAwIDBAYECgcGBAUEAwABAAIDBBEFEiETMUFRBiJhcYGRFDKhsRUjM0JSYnOSwdE0Q1NygrLhJHSDk6LwBxZj0jVERZTCJVSEo/GE/8QAGQEBAQEBAQEAAAAAAAAAAAAAAAECAwQF/8QAJBEBAQEAAwEAAgIBBQAAAAAAABEBAiExEkFRA2EiMqGx0eH/2gAMAwEAAhEDEQA/APmaEIVQhCEQIQiyAQE0IBCEIBNJNAIQgIBBR4JgEUJoQKyAmhAIQmqEhNFkCQnZCISE7IsgSE7IsgSE7IsikhNCBITQoEhNCBITQgSE0IEhNCBITQgSE0kAhNFkCQmhAkJoQJCEIBCEIBCEIBCEIBK6aECQmhAk0IQJBTQgSEIsgEIQgEIQgEIQgihCEUIQhECAjxTQCEIQCE0kDQhFkAhNCBWQE0KgQmhAk0WQiBCEIBCaaBITtqiyBITsnZBFClZFkEbIspWRZBG3YhSsiyCCFOyLIIospWRZBGyLKVkWQRQpWRZBFFlKyLIIpWU7IsggmpWRZFRSUrIsgihSsiyCKE0IFZCaSAQmlZQJCdkkAhCEAhNJAIQhAIQhAJJoQJCaSAQpMa57w1oLnHQAceKt9FpqfSqlc+TjHFbq97lcypu5jBqhbdtRDdQjxlKFfn+2fv+mBCELLoEIQiBCaEAmkhA0IRZAJoTVCQmiyAsjinZCIEIsnwQJOyYRZArIsmmgVkKVkWRCshSsiyoQCLKVkwEEbIsp2TyoKw1GVW5SnlQqrKllV2VGVEU5UWV2RLKiqrIsrcqMiCqyLK3J2IyoKsqLK3KjL2IKsqLK3InkPJBTl7EZexXZDyRk7EFVillV2VGXsQVZUZdFdk7PYlk5IKcqLK7IlkQVZUrK7IlkUFNkWVuVLKiq7JWVuVRsgr4osppWRAo................
+          EOT
+          
+          # Проверяем, что файл скачался (для отладки)
+          ls -la app/src/main/res/drawable/
+
+          # Создание MainActivity.kt
+          cat > app/src/main/java/com/example/dash/MainActivity.kt <<'EOT'
+          package com.example.dash
 
           import android.Manifest
           import android.app.Activity
@@ -160,82 +164,52 @@ jobs:
               }
 
               private fun showModeMenu() {
-                  val items = arrayOf(
-                      "Тестовый режим (демо)",
-                      "Реальный режим (Bluetooth OBD-II)",
-                      "Выбрать адаптер заново",
-                      "Сбросить пробег"
-                  )
-                  AlertDialog.Builder(this).setTitle("Меню")
-                      .setItems(items) { _, i ->
-                          when (i) {
-                              0 -> startDemo()
-                              1 -> {
-                                  val a = prefs.getString("addr", null)
-                                  val p = prefs.getString("proto", null)
-                                  if (a != null && p != null) startReal(a, p) else chooseAndStart()
-                              }
-                              2 -> { prefs.edit().remove("addr").remove("proto").apply(); chooseAndStart() }
-                              3 -> { dash?.trip = 0f; dash?.postInvalidate() }
-                          }
-                      }.show()
+                  val items = arrayOf("Тестовый режим (демо)", "Реальный режим (Bluetooth OBD-II)", "Выбрать адаптер заново", "Сбросить пробег")
+                  AlertDialog.Builder(this).setTitle("Меню").setItems(items) { _, i ->
+                      when (i) {
+                          0 -> startDemo()
+                          1 -> { val a = prefs.getString("addr", null); val p = prefs.getString("proto", null); if (a != null && p != null) startReal(a, p) else chooseAndStart() }
+                          2 -> { prefs.edit().remove("addr").remove("proto").apply(); chooseAndStart() }
+                          3 -> { dash?.trip = 0f; dash?.postInvalidate() }
+                      }
+                  }.show()
               }
 
               private fun showFirstRunDialog() {
-                  AlertDialog.Builder(this)
-                      .setTitle("Первый запуск")
-                      .setMessage("Выберите режим. Сменить можно долгим нажатием на экран.")
+                  AlertDialog.Builder(this).setTitle("Первый запуск").setMessage("Выберите режим. Сменить можно долгим нажатием на экран.")
                       .setPositiveButton("Тестовый режим") { _, _ -> startDemo() }
                       .setNegativeButton("Подключить OBD-II") { _, _ -> chooseAndStart() }
-                      .setCancelable(false)
-                      .show()
+                      .setCancelable(false).show()
               }
 
               private fun startDemo() {
-                  stopAll()
-                  running = true
-                  demoT = 0f
-                  dash?.status = "ТЕСТОВЫЙ РЕЖИМ"
-                  dash?.postInvalidate()
-                  ui.post(demoTick)
+                  stopAll(); running = true; demoT = 0f; dash?.status = "ТЕСТОВЫЙ РЕЖИМ"; dash?.postInvalidate(); ui.post(demoTick)
               }
 
               private fun chooseAndStart() {
                   val d = dash ?: return
-                  if (Build.VERSION.SDK_INT >= 31 &&
-                      checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
-                      requestPermissions(arrayOf(Manifest.permission.BLUETOOTH_CONNECT), 1)
-                      return
+                  if (Build.VERSION.SDK_INT >= 31 && checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+                      requestPermissions(arrayOf(Manifest.permission.BLUETOOTH_CONNECT), 1); return
                   }
                   try {
                       val mgr = getSystemService(BluetoothManager::class.java)
                       if (mgr?.adapter == null) { d.status = "Bluetooth не поддерживается"; d.postInvalidate(); return }
                       if (!mgr.adapter.isEnabled) { d.status = "Включите Bluetooth"; d.postInvalidate(); return }
                       val devs = try { mgr.adapter.bondedDevices?.toList() ?: emptyList() } catch (_: SecurityException) { emptyList() }
-                      if (devs.isEmpty()) {
-                          d.status = "Спарьте ELM327 в настройках (PIN 1234/0000)"
-                          d.postInvalidate(); return
-                      }
-                      AlertDialog.Builder(this).setTitle("Адаптер")
-                          .setItems(devs.map { it.name ?: it.address }.toTypedArray()) { _, i ->
-                              val names = arrayOf("Авто (0)", "ISO 9141-2 (3)", "KWP 5 baud (4)", "KWP fast (5)")
-                              val codes = arrayOf("0", "3", "4", "5")
-                              AlertDialog.Builder(this).setTitle("Протокол (как в Car Scanner)")
-                                  .setItems(names) { _, j ->
-                                      prefs.edit().putString("addr", devs[i].address).putString("proto", codes[j]).apply()
-                                      startReal(devs[i].address, codes[j])
-                                  }.show()
+                      if (devs.isEmpty()) { d.status = "Спарьте ELM327 в настройках (PIN 1234/0000)"; d.postInvalidate(); return }
+                      AlertDialog.Builder(this).setTitle("Адаптер").setItems(devs.map { it.name ?: it.address }.toTypedArray()) { _, i ->
+                          val names = arrayOf("Авто (0)", "ISO 9141-2 (3)", "KWP 5 baud (4)", "KWP fast (5)")
+                          val codes = arrayOf("0", "3", "4", "5")
+                          AlertDialog.Builder(this).setTitle("Протокол (как в Car Scanner)").setItems(names) { _, j ->
+                              prefs.edit().putString("addr", devs[i].address).putString("proto", codes[j]).apply()
+                              startReal(devs[i].address, codes[j])
                           }.show()
-                  } catch (t: Throwable) {
-                      d.status = "Ошибка BT: ${t.message?.take(60)}"
-                      d.postInvalidate()
-                  }
+                      }.show()
+                  } catch (t: Throwable) { d.status = "Ошибка BT: ${t.message?.take(60)}"; d.postInvalidate() }
               }
 
               private fun startReal(addr: String, proto: String) {
-                  stopAll()
-                  val my = ++session
-                  running = true
+                  stopAll(); val my = ++session; running = true
                   Thread {
                       while (running && my == session) {
                           try {
@@ -244,124 +218,71 @@ jobs:
                               val ad = mgr.adapter ?: break
                               try { ad.cancelDiscovery() } catch (_: Throwable) {}
                               val s = ad.getRemoteDevice(addr).createRfcommSocketToServiceRecord(SPP)
-                              s.connect()
-                              socket = s
-                              val inp = s.inputStream
-                              val out = s.outputStream
+                              s.connect(); socket = s
+                              val inp = s.inputStream; val out = s.outputStream
                               for (c in listOf("ATZ", "ATE0", "ATL0", "ATH0", "ATS0", "ATSP$proto")) {
-                                  cmd(inp, out, c)
-                                  if (c == "ATZ") { try { Thread.sleep(500) } catch (_: InterruptedException) {} }
+                                  cmd(inp, out, c); if (c == "ATZ") { try { Thread.sleep(500) } catch (_: InterruptedException) {} }
                               }
-                              cmd(inp, out, "0100")
-                              setStatus("")
-                              poll(inp, out, my)
-                          } catch (e: Throwable) {
-                              setStatus("Нет связи: ${e.message?.take(40) ?: "ошибка"}. Повтор...")
-                          }
-                          try { socket?.close() } catch (_: Throwable) {}
-                          socket = null
+                              cmd(inp, out, "0100"); setStatus(""); poll(inp, out, my)
+                          } catch (e: Throwable) { setStatus("Нет связи: ${e.message?.take(40) ?: "ошибка"}. Повтор...") }
+                          try { socket?.close() } catch (_: Throwable) {}; socket = null
                           try { Thread.sleep(3000) } catch (_: InterruptedException) {}
                       }
                   }.start()
               }
 
-              private fun stopAll() {
-                  running = false
-                  ui.removeCallbacksAndMessages(null)
-                  try { socket?.close() } catch (_: Throwable) {}
-                  socket = null
-                  val d = dash ?: return
-                  d.postInvalidate()
-              }
-
-              private fun setStatus(s: String) {
-                  ui.post { dash?.let { it.status = s; it.postInvalidate() } }
-              }
+              private fun stopAll() { running = false; ui.removeCallbacksAndMessages(null); try { socket?.close() } catch (_: Throwable) {}; socket = null; dash?.postInvalidate() }
+              private fun setStatus(s: String) { ui.post { dash?.let { it.status = s; it.postInvalidate() } } }
 
               private fun poll(inp: InputStream, out: OutputStream, my: Int) {
-                  var sum = 0L; var n = 0L; var loop = 0; var noData = 0
-                  val fails = IntArray(3)
-                  var last = System.nanoTime()
-                  val d = dash ?: return
+                  var sum = 0L; var n = 0L; var loop = 0; var noData = 0; val fails = IntArray(3); var last = System.nanoTime(); val d = dash ?: return
                   while (running && my == session) {
-                      val v = pid(inp, out, "010D", 2)
-                      val r = pid(inp, out, "010C", 4)
+                      val v = pid(inp, out, "010D", 2); val r = pid(inp, out, "010C", 4)
                       if (v == null && r == null) { if (++noData >= 5) throw IOException("нет ответа ЭБУ") } else noData = 0
-                      v?.let {
-                          d.speed = it
-                          if (it > d.maxSpeed) d.maxSpeed = it
-                          if (it > 0) { sum += it; n++; d.avg = sum.toFloat() / n }
-                      }
+                      v?.let { d.speed = it; if (it > d.maxSpeed) d.maxSpeed = it; if (it > 0) { sum += it; n++; d.avg = sum.toFloat() / n } }
                       r?.let { d.rpm = it / 4 }
                       if (loop % 10 == 0) {
                           if (fails[0] < 3) pid(inp, out, "0105", 2)?.let { d.temp = it - 40 } ?: fails[0]++
                           if (fails[1] < 3) pid(inp, out, "010F", 2)?.let { d.outTemp = it - 40 } ?: fails[1]++
                           if (fails[2] < 3) pid(inp, out, "012F", 2)?.let { d.fuel = it / 255f } ?: fails[2]++
                       }
-                      val now = System.nanoTime()
-                      d.trip += d.speed * ((now - last) / 1e9f) / 3600f
-                      last = now
-                      d.gear = guessGear(d.speed, d.rpm)
-                      ui.post { d.invalidate() }
-                      loop++
+                      val now = System.nanoTime(); d.trip += d.speed * ((now - last) / 1e9f) / 3600f; last = now
+                      d.gear = guessGear(d.speed, d.rpm); ui.post { d.invalidate() }; loop++
                   }
               }
 
               private fun guessGear(v: Int, rpm: Int): Int {
                   if (v < 3 || rpm < 100) return 0
-                  val ratio = rpm / v.toFloat()
-                  var best = 1; var bd = Float.MAX_VALUE
+                  val ratio = rpm / v.toFloat(); var best = 1; var bd = Float.MAX_VALUE
                   GEARS.forEachIndexed { i, k -> val dd = abs(ln(ratio / k)); if (dd < bd) { bd = dd; best = i + 1 } }
                   return best
               }
 
               private fun cmd(inp: InputStream, out: OutputStream, s: String): String {
-                  out.write((s + "\r").toByteArray()); out.flush()
-                  val sb = StringBuilder()
-                  while (true) {
-                      val c = try { inp.read() } catch (_: IOException) { -1 }
-                      if (c < 0 || c == '>'.code) break
-                      sb.append(c.toChar())
-                  }
+                  out.write((s + "\r").toByteArray()); out.flush(); val sb = StringBuilder()
+                  while (true) { val c = try { inp.read() } catch (_: IOException) { -1 }; if (c < 0 || c == '>'.code) break; sb.append(c.toChar()) }
                   return sb.toString()
               }
 
               private fun pid(inp: InputStream, out: OutputStream, q: String, hexLen: Int): Int? {
-                  val r = cmd(inp, out, q)
-                      .replace("SEARCHING...", "")
-                      .replace("NO DATA", "")
-                      .replace(Regex("\\s"), "")
-                      .uppercase()
+                  val r = cmd(inp, out, q).replace("SEARCHING...", "").replace("NO DATA", "").replace(Regex("\\s"), "").uppercase()
                   if (r.contains("7F") || r.startsWith("?") || r.isEmpty()) return null
-                  val key = "41" + q.substring(2)
-                  val i = r.indexOf(key)
+                  val key = "41" + q.substring(2); val i = r.indexOf(key)
                   if (i < 0 || r.length < i + key.length + hexLen) return null
                   return r.substring(i + key.length, i + key.length + hexLen).toIntOrNull(16)
               }
 
               override fun onRequestPermissionsResult(c: Int, p: Array<out String>, r: IntArray) {
-                  if (r.isNotEmpty() && r[0] == PackageManager.PERMISSION_GRANTED) chooseAndStart()
-                  else { dash?.status = "Разрешите «Устройства поблизости»"; dash?.postInvalidate() }
+                  if (r.isNotEmpty() && r[0] == PackageManager.PERMISSION_GRANTED) chooseAndStart() else { dash?.status = "Разрешите «Устройства поблизости»"; dash?.postInvalidate() }
               }
-
-              override fun onStop() {
-                  try { dash?.let { prefs.edit().putFloat("trip", it.trip).apply() } } catch (_: Throwable) {}
-                  super.onStop()
-              }
-
-              override fun onDestroy() {
-                  stopAll()
-                  super.onDestroy()
-              }
+              override fun onStop() { try { dash?.let { prefs.edit().putFloat("trip", it.trip).apply() } } catch (_: Throwable) {}; super.onStop() }
+              override fun onDestroy() { stopAll(); super.onDestroy() }
           }
 
           private const val DW = 1916f
           private const val DH = 821f
 
-          private class Dial(
-              val cx: Float, val cy: Float, val max: Float, val major: Float, val minor: Float,
-              val sub: Float, val label: Float, val tail: Float, stops: List<Pair<Float, String>>
-          ) {
+          private class Dial(val cx: Float, val cy: Float, val max: Float, val major: Float, val minor: Float, val sub: Float, val label: Float, val tail: Float, stops: List<Pair<Float, String>>) {
               private val colors = IntArray(stops.size + 1)
               private val pos = FloatArray(stops.size + 1)
               val rect = RectF(cx - 232, cy - 232, cx + 232, cy + 232)
@@ -372,25 +293,16 @@ jobs:
                   colors[stops.size] = colors[stops.size - 1]; pos[stops.size] = 1f
               }
               val shader: Shader by lazy {
-                  try {
-                      SweepGradient(cx, cy, colors, pos).also { s -> s.setLocalMatrix(Matrix().apply { postRotate(135f, cx, cy) }) }
-                  } catch (_: Throwable) {
-                      LinearGradient(0f, 0f, cx * 2, 0f, Color.rgb(39, 182, 255), Color.rgb(255, 138, 42), Shader.TileMode.CLAMP)
-                  }
+                  try { SweepGradient(cx, cy, colors, pos).also { s -> s.setLocalMatrix(Matrix().apply { postRotate(135f, cx, cy) }) } }
+                  catch (_: Throwable) { LinearGradient(0f, 0f, cx * 2, 0f, Color.rgb(39, 182, 255), Color.rgb(255, 138, 42), Shader.TileMode.CLAMP) }
               }
               fun ang(v: Float) = Math.toRadians(135.0 + 255.0 * v / max).toFloat()
           }
 
           class DashView(ctx: Context) : View(ctx) {
-              @Volatile var speed = 0
-              @Volatile var rpm = 0
-              @Volatile var temp = 0
-              @Volatile var maxSpeed = 0
-              @Volatile var avg = 0f
-              @Volatile var trip = 0f
-              @Volatile var gear = 0
-              @Volatile var outTemp: Int? = null
-              @Volatile var fuel = -1f
+              @Volatile var speed = 0; @Volatile var rpm = 0; @Volatile var temp = 0; @Volatile var maxSpeed = 0
+              @Volatile var avg = 0f; @Volatile var trip = 0f; @Volatile var gear = 0
+              @Volatile var outTemp: Int? = null; @Volatile var fuel = -1f
               @Volatile var status = "Долгое нажатие — меню"
 
               private val p = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -400,26 +312,19 @@ jobs:
               private val tBI = Typeface.create("sans-serif", Typeface.BOLD_ITALIC)
               private val tRI = Typeface.create("sans-serif", Typeface.ITALIC)
 
-              private val cDim = Color.parseColor("#7FA2BD")
-              private val cLight = Color.parseColor("#D7ECFF")
-              private val cWhite = Color.parseColor("#F2FBFF")
-              private val cCy = Color.parseColor("#27B6FF")
-              private val cOr = Color.parseColor("#FF8A2A")
-              private val cHot = Color.parseColor("#FFB066")
-              private val cLabel = Color.parseColor("#4FC3F7")
-              private val cLabel2 = Color.parseColor("#8FD3FF")
+              private val cDim = Color.parseColor("#7FA2BD"); private val cLight = Color.parseColor("#D7ECFF")
+              private val cWhite = Color.parseColor("#F2FBFF"); private val cCy = Color.parseColor("#27B6FF")
+              private val cOr = Color.parseColor("#FF8A2A"); private val cHot = Color.parseColor("#FFB066")
+              private val cLabel = Color.parseColor("#4FC3F7"); private val cLabel2 = Color.parseColor("#8FD3FF")
               private val cNeedle = Color.parseColor("#BFEAFF")
 
-              private val spd = Dial(342f, 398f, 220f, 20f, 10f, 5f, 20f, .82f,
-                  listOf(0f to "#1C7BFF", .35f to "#27B6FF", .6f to "#8FE8FF", .72f to "#DFF6FF", .82f to "#FFC44A", 1f to "#FF8A1F"))
-              private val rpmD = Dial(1612f, 398f, 8f, 1f, .5f, .25f, 1f, .75f,
-                  listOf(0f to "#1C7BFF", .3f to "#27B6FF", .55f to "#9BEBFF", .7f to "#F4FBFF", .76f to "#FFB13B", 1f to "#FF3B2A"))
-
+              private val spd = Dial(342f, 398f, 220f, 20f, 10f, 5f, 20f, .82f, listOf(0f to "#1C7BFF", .35f to "#27B6FF", .6f to "#8FE8FF", .72f to "#DFF6FF", .82f to "#FFC44A", 1f to "#FF8A1F"))
+              private val rpmD = Dial(1612f, 398f, 8f, 1f, .5f, .25f, 1f, .75f, listOf(0f to "#1C7BFF", .3f to "#27B6FF", .55f to "#9BEBFF", .7f to "#F4FBFF", .76f to "#FFB13B", 1f to "#FF3B2A"))
               private val fuelCols = arrayOf("#FFB23E", "#27A9FF", "#35B8FF", "#4CC9FF", "#7FDCFF", "#A8E8FF").map { Color.parseColor(it) }.toIntArray()
               private val coolCols = arrayOf("#1EA0FF", "#27B6FF", "#4CC9FF", "#7FDCFF", "#FF8A2A", "#FF3B2A").map { Color.parseColor(it) }.toIntArray()
               private val unlit = Color.argb(72, 70, 110, 150)
 
-              // Загрузка картинки машины с красивым растворением краев
+              // Тут грузим картинку
               private val car: Bitmap? by lazy {
                   try {
                       val src = BitmapFactory.decodeResource(resources, R.drawable.car, BitmapFactory.Options().apply { inScaled = false })
@@ -448,21 +353,16 @@ jobs:
                   p.reset(); p.isAntiAlias = true; p.color = color; p.textSize = size; p.typeface = tf; p.textAlign = al
                   c.drawText(s, x, y, p)
               }
-              private fun tw(s: String, size: Float, tf: Typeface): Float {
-                  p.reset(); p.textSize = size; p.typeface = tf; return p.measureText(s)
-              }
+              private fun tw(s: String, size: Float, tf: Typeface): Float { p.reset(); p.textSize = size; p.typeface = tf; return p.measureText(s) }
 
               override fun onSizeChanged(w: Int, h: Int, ow: Int, oh: Int) {
                   if (w <= 0 || h <= 0) return
                   try {
-                      sc = min(w / DW, h / DH)
-                      if (sc <= 0f) sc = 1f
+                      sc = min(w / DW, h / DH); if (sc <= 0f) sc = 1f
                       ox = (w - DW * sc) / 2f; oy = (h - DH * sc) / 2f
-                      val bw = (DW * sc).toInt().coerceAtLeast(1)
-                      val bh = (DH * sc).toInt().coerceAtLeast(1)
+                      val bw = (DW * sc).toInt().coerceAtLeast(1); val bh = (DH * sc).toInt().coerceAtLeast(1)
                       val bmp = Bitmap.createBitmap(bw, bh, Bitmap.Config.ARGB_8888)
-                      val c = Canvas(bmp); c.scale(sc, sc)
-                      drawStatic(c); staticBmp = bmp
+                      val c = Canvas(bmp); c.scale(sc, sc); drawStatic(c); staticBmp = bmp
                   } catch (_: Throwable) { staticBmp = null }
               }
 
@@ -470,7 +370,6 @@ jobs:
                   c.drawArc(d.rectOuter, 135f - 2.3f, 255f + 4.6f, false, pt(Color.argb(56, 39, 182, 255), 2f))
                   val tr = pt(Color.WHITE, 7f); tr.shader = d.shader; tr.alpha = 102
                   c.drawArc(d.rect, 135f, 255f, false, tr)
-
                   val n = (d.max / d.sub).roundToInt()
                   fun isK(v: Float, q: Float) = abs(v / q - (v / q).roundToInt()) < 1e-4
                   for (i in 0..n) {
@@ -501,49 +400,36 @@ jobs:
                   }
               }
               private fun icoGauge(c: Canvas, cx: Float, cy: Float) {
-                  c.drawCircle(cx, cy, 23f, pt(cLabel, 3f))
-                  c.drawLine(cx, cy + 4, cx + 11, cy - 10, pt(cLabel, 3f))
-                  c.drawCircle(cx, cy, 3f, pt(cLabel, 3f))
+                  c.drawCircle(cx, cy, 23f, pt(cLabel, 3f)); c.drawLine(cx, cy + 4, cx + 11, cy - 10, pt(cLabel, 3f)); c.drawCircle(cx, cy, 3f, pt(cLabel, 3f))
                   c.drawArc(RectF(cx - 15, cy - 15, cx + 15, cy + 15), 144f, 252f, false, pt(cLabel, 2f))
               }
               private fun icoFuel(c: Canvas, cx: Float, cy: Float, col: Int) {
-                  c.drawRoundRect(cx - 14, cy - 20, cx + 6, cy + 20, 3f, 3f, pt(col, 3f))
-                  c.drawRoundRect(cx - 9, cy - 14, cx + 1, cy - 3, 1f, 1f, pt(col, 3f))
-                  path.reset(); path.moveTo(cx + 6, cy - 6); path.lineTo(cx + 16, cy - 6); path.lineTo(cx + 16, cy + 10)
-                  c.drawPath(path, pt(col, 3f))
+                  c.drawRoundRect(cx - 14, cy - 20, cx + 6, cy + 20, 3f, 3f, pt(col, 3f)); c.drawRoundRect(cx - 9, cy - 14, cx + 1, cy - 3, 1f, 1f, pt(col, 3f))
+                  path.reset(); path.moveTo(cx + 6, cy - 6); path.lineTo(cx + 16, cy - 6); path.lineTo(cx + 16, cy + 10); c.drawPath(path, pt(col, 3f))
               }
 
               private fun drawStatic(c: Canvas) {
-                  val bg = pt(Color.WHITE).also {
-                      it.shader = RadialGradient(DW / 2, DH * .45f, DW * .62f, Color.parseColor("#0D1B2A"), Color.parseColor("#04070C"), Shader.TileMode.CLAMP)
-                  }
+                  val bg = pt(Color.WHITE).also { it.shader = RadialGradient(DW / 2, DH * .45f, DW * .62f, Color.parseColor("#0D1B2A"), Color.parseColor("#04070C"), Shader.TileMode.CLAMP) }
                   c.drawRoundRect(0f, 0f, DW, DH, 34f, 34f, bg)
                   dialStatic(c, spd); dialStatic(c, rpmD)
-                  
-                  // Рисуем машину по центру (координаты подобраны под вашу картинку)
-                  car?.let { c.drawBitmap(it, 650f, 240f, null) }
+                  car?.let { c.drawBitmap(it, 650f, 240f, null) } // Выводим машину
 
-                  // верхняя плашка
                   val pl = pt(Color.argb(140, 39, 182, 255), 2f); pl.setShadowLayer(10f, 0f, 0f, cCy)
-                  path.reset(); path.moveTo(527f, 128f); path.lineTo(527f, 150f); path.quadTo(540f, 184f, 575f, 184f)
-                  path.lineTo(1340f, 184f); path.quadTo(1378f, 184f, 1390f, 150f); path.lineTo(1390f, 128f)
+                  path.reset(); path.moveTo(527f, 128f); path.lineTo(527f, 150f); path.quadTo(540f, 184f, 575f, 184f); path.lineTo(1340f, 184f); path.quadTo(1378f, 184f, 1390f, 150f); path.lineTo(1390f, 128f)
                   c.drawPath(path, pl)
                   path.reset(); path.moveTo(722f, 180f); path.lineTo(742f, 158f); path.lineTo(818f, 158f); c.drawPath(path, pl)
                   path.reset(); path.moveTo(1100f, 158f); path.lineTo(1170f, 158f); path.lineTo(1195f, 180f); c.drawPath(path, pl)
 
-                  // правая панель
                   c.drawRoundRect(1170f, 242f, 1422f, 533f, 18f, 18f, pt(Color.argb(199, 10, 22, 36)).also { it.style = Paint.Style.FILL })
                   c.drawRoundRect(1170f, 242f, 1422f, 533f, 18f, 18f, pt(Color.argb(115, 39, 182, 255), 2f))
                   for (y in floatArrayOf(335f, 434f)) c.drawLine(1182f, y, 1410f, y, pt(Color.argb(64, 39, 182, 255), 1.5f))
                   icoTherm(c, 1212f, 282f, cLabel); icoGauge(c, 1212f, 384f); icoGauge(c, 1212f, 484f)
 
-                  // нижняя панель
                   c.drawRoundRect(70f, 582f, 1850f, 680f, 44f, 44f, pt(Color.argb(235, 8, 16, 28)).also { it.style = Paint.Style.FILL })
                   val tl = pt(Color.WHITE, 2f)
                   tl.shader = LinearGradient(70f, 0f, 1850f, 0f, intArrayOf(Color.argb(0, 39, 182, 255), Color.argb(204, 39, 182, 255), Color.argb(0, 39, 182, 255)), null, Shader.TileMode.CLAMP)
                   c.drawLine(110f, 583f, 1810f, 583f, tl)
-                  icoFuel(c, 127f, 617f, Color.parseColor("#7FD0FF"))
-                  icoTherm(c, 1789f, 612f, Color.parseColor("#7FD0FF"))
+                  icoFuel(c, 127f, 617f, Color.parseColor("#7FD0FF")); icoTherm(c, 1789f, 612f, Color.parseColor("#7FD0FF"))
                   tx(c, "E", 178f, 634f, 22f, Color.parseColor("#FFB23E")); tx(c, "F", 433f, 634f, 22f, cLight)
                   tx(c, "C", 1466f, 634f, 22f, cLight); tx(c, "H", 1725f, 634f, 22f, Color.parseColor("#FF5A3A"))
                   tx(c, "ПУТЬ", 549f, 640f, 18f, cDim)
@@ -555,8 +441,7 @@ jobs:
                       q.setShadowLayer(22f, 0f, 0f, if (f > d.tail) cOr else cCy)
                       c.drawArc(d.rect, 135f, 255f * f, false, q)
                   }
-                  val a = Math.toRadians(135.0 + 255.0 * f).toFloat()
-                  val n = pt(cNeedle, 5f); n.setShadowLayer(14f, 0f, 0f, cCy)
+                  val a = Math.toRadians(135.0 + 255.0 * f).toFloat(); val n = pt(cNeedle, 5f); n.setShadowLayer(14f, 0f, 0f, cCy)
                   c.drawLine(d.cx + cos(a) * 122f, d.cy + sin(a) * 122f, d.cx + cos(a) * 198f, d.cy + sin(a) * 198f, n)
               }
 
@@ -575,20 +460,15 @@ jobs:
                       c.drawColor(Color.BLACK)
                       staticBmp?.let { c.drawBitmap(it, ox, oy, null) } ?: return
                       if (t0 == 0L) t0 = System.nanoTime()
-                      val t = (System.nanoTime() - t0) / 1e9f
-                      val booting = t < 2.8f
+                      val t = (System.nanoTime() - t0) / 1e9f; val booting = t < 2.8f
                       c.save(); c.translate(ox, oy); c.scale(sc, sc)
 
                       val fs: Float; val fr: Float
                       if (booting) {
                           val pr = t / 2.8f
                           fun e(x: Float) = if (x < .5f) 4 * x * x * x else 1 - Math.pow((-2 * x + 2).toDouble(), 3.0).toFloat() / 2
-                          val v = if (pr < .5f) e(pr * 2) else 1 - e(pr * 2 - 1)
-                          fs = v; fr = v
-                      } else {
-                          fs = min(speed.toFloat(), spd.max) / spd.max
-                          fr = min(rpm.toFloat(), 8000f) / 8000f
-                      }
+                          val v = if (pr < .5f) e(pr * 2) else 1 - e(pr * 2 - 1); fs = v; fr = v
+                      } else { fs = min(speed.toFloat(), spd.max) / spd.max; fr = min(rpm.toFloat(), 8000f) / 8000f }
                       dialDyn(c, spd, fs); dialDyn(c, rpmD, fr)
 
                       val sp = speed; val hot = sp > 110
@@ -604,21 +484,14 @@ jobs:
                       tx(c, if (ot == null) "--°C" else (if (ot >= 0) "+$ot°C" else "$ot°C"), 1283f, 167f, 28f, Color.parseColor("#E8F6FF"), tM, Paint.Align.CENTER)
 
                       data class Row(val label: String, val value: String, val unit: String, val ly: Float, val vy: Float, val col: Int)
-                      val rows = listOf(
-                          Row("Температура ОЖ", temp.toString(), "°C", 271f, 312f, cLabel),
-                          Row("Максимум", maxSpeed.toString(), "км/ч", 367f, 412f, cLabel2),
-                          Row("Средняя", avg.roundToInt().toString(), "км/ч", 467f, 512f, cLabel2)
-                      )
+                      val rows = listOf(Row("Температура ОЖ", temp.toString(), "°C", 271f, 312f, cLabel), Row("Максимум", maxSpeed.toString(), "км/ч", 367f, 412f, cLabel2), Row("Средняя", avg.roundToInt().toString(), "км/ч", 467f, 512f, cLabel2))
                       rows.forEach { r ->
-                          tx(c, r.label, 1264f, r.ly, 17f, r.col)
-                          tx(c, r.value, 1264f, r.vy, 36f, cWhite, tMI)
+                          tx(c, r.label, 1264f, r.ly, 17f, r.col); tx(c, r.value, 1264f, r.vy, 36f, cWhite, tMI)
                           tx(c, r.unit, 1264f + tw(r.value, 36f, tMI) + 8f, r.vy, 19f, cLight, tRI)
                       }
 
-                      val lf = if (fuel < 0) 0 else (fuel * 6).roundToInt()
-                      val tf = ((temp - 40) / 70f).coerceIn(0f, 1f)
-                      segs(c, 205f, 619f, lf, fuelCols)
-                      segs(c, 1498f, 619f, (tf * 6).roundToInt(), coolCols)
+                      val lf = if (fuel < 0) 0 else (fuel * 6).roundToInt(); val tf = ((temp - 40) / 70f).coerceIn(0f, 1f)
+                      segs(c, 205f, 619f, lf, fuelCols); segs(c, 1498f, 619f, (tf * 6).roundToInt(), coolCols)
 
                       val u1 = pt(Color.WHITE, 2f)
                       u1.shader = LinearGradient(205f, 0f, 420f, 0f, intArrayOf(Color.argb(204, 255, 178, 62), Color.argb(204, 127, 220, 255), Color.argb(26, 127, 220, 255)), floatArrayOf(0f, .4f, 1f), Shader.TileMode.CLAMP)
@@ -628,8 +501,7 @@ jobs:
                       c.drawLine(1498f, 642f, 1712f, 642f, u2)
 
                       val tripS = String.format(Locale.US, "%06.1f", trip)
-                      tx(c, tripS, 617f, 642f, 32f, cWhite, tMI)
-                      tx(c, "км", 617f + tw(tripS, 32f, tMI) + 10f, 642f, 18f, cLight, tRI)
+                      tx(c, tripS, 617f, 642f, 32f, cWhite, tMI); tx(c, "км", 617f + tw(tripS, 32f, tMI) + 10f, 642f, 18f, cLight, tRI)
 
                       val gs = arrayOf("N", "1", "2", "3", "4", "5")
                       gs.forEachIndexed { i, s ->
@@ -653,21 +525,13 @@ jobs:
           cat > app/src/main/AndroidManifest.xml <<'EOT'
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-
               <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
               <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
               <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
               <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
               <uses-feature android:name="android.hardware.bluetooth" android:required="false" />
-
-              <application
-                  android:label="Панель ВАЗ"
-                  android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen">
-                  <activity
-                      android:name=".MainActivity"
-                      android:exported="true"
-                      android:screenOrientation="sensorLandscape"
-                      android:configChanges="orientation|screenSize|screenLayout|keyboardHidden">
+              <application android:label="Панель ВАЗ" android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen">
+                  <activity android:name=".MainActivity" android:exported="true" android:screenOrientation="sensorLandscape" android:configChanges="orientation|screenSize|screenLayout|keyboardHidden">
                       <intent-filter>
                           <action android:name="android.intent.action.MAIN" />
                           <category android:name="android.intent.category.LAUNCHER" />
@@ -679,12 +543,8 @@ jobs:
 
           # Создание Gradle файлов
           cat > settings.gradle.kts <<'EOT'
-          pluginManagement {
-              repositories { google(); mavenCentral(); gradlePluginPortal() }
-          }
-          dependencyResolutionManagement {
-              repositories { google(); mavenCentral() }
-          }
+          pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
+          dependencyResolutionManagement { repositories { google(); mavenCentral() } }
           rootProject.name = "dash"
           include(":app")
           EOT
