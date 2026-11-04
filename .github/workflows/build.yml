@@ -23,14 +23,11 @@ jobs:
         run: |
           mkdir -p app/src/main/java/com/example/dash app/src/main/res/drawable
           
-          # Восстанавливаем картинку машины из встроенного base64 прямо в проект
+          # Восстанавливаем картинку машины из base64 прямо в папку ресурсов Android
           cat > app/src/main/res/drawable/car.jpg <<'EOT'
           /9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAA0JCgsKCA0LCgsODg0PEyAVExISEyccHhcgLikxMC4pLSwzOko+MzZGNywtQFdBRkxOUlNSMj5aYVpQYEpRUk//2wBDAQ4ODhMREyYVFSZPNS01T09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT0//wAARCAFyAnYDASIAAhEBAxEB/8QAGwAAAgMBAQEAAAAAAAAAAAAAAAECAwQFBgf/xABREAABAwIDBAYECgcGBAUEAwABAAIDBBEFEiETMUFRBiJhcYGRFDKhsRUjM0JSYnOSwdE0Q1NygrLhJHSDk6LwBxZj0jVERZTCJVSEo/GE/8QAGQEBAQEBAQEAAAAAAAAAAAAAAAECAwQF/8QAJBEBAQEAAwEAAgIBBQAAAAAAABEBAiExEkFRA2EiMqGx0eH/2gAMAwEAAhEDEQA/APmaEIVQhCEQIQiyAQE0IBCEIBNJNAIQgIBBR4JgEUJoQKyAmhAIQmqEhNFkCQnZCISE7IsgSE7IsgSE7IsikhNCBITQoEhNCBITQgSE0IEhNCBITQgSE0kAhNFkCQmhAkJoQJCEIBCEIBCEIBCEIBK6aECQmhAk0IQJBTQgSEIsgEIQgEIQgEIQgihCEUIQhECAjxTQCEIQCE0kDQhFkAhNCBWQE0KgQmhAk0WQiBCEIBCaaBITtqiyBITsnZBFClZFkEbIspWRZBG3YhSsiyCCFOyLIIospWRZBGyLKVkWQRQpWRZBFFlKyLIIpWU7IsggmpWRZFRSUrIsgihSsiyCKE0IFZCaSAQmlZQJCdkkAhCEAhNJAIQhAIQhAJJoQJCaSAQpMa57w1oLnHQAceKt9FpqfSqlc+TjHFbq97lcypu5jBqhbdtRDdQjxlKFfn+2fv+mBCELLoEIQiBCaEAmkhA0IRZAJoTVCQmiyAsjinZCIEIsnwQJOyYRZArIsmmgVkKVkWRCshSsiyoQCLKVkwEEbIsp2TyoKw1GVW5SnlQqrKllV2VGVEU5UWV2RLKiqrIsrcqMiCqyLK3J2IyoKsqLK3KjL2IKsqLK3InkPJBTl7EZexXZDyRk7EFVillV2VGXsQVZUZdFdk7PYlk5IKcqLK7IlkQVZUrK7IlkUFNkWVuVLKiq7JWVuVRsgr4osppWRAo................
           EOT
           
-          # Проверяем, что файл скачался (для отладки)
-          ls -la app/src/main/res/drawable/
-
           # Создание MainActivity.kt
           cat > app/src/main/java/com/example/dash/MainActivity.kt <<'EOT'
           package com.example.dash
@@ -77,6 +74,8 @@ jobs:
               @Volatile private var session = 0
               private val prefs by lazy { getSharedPreferences("dash", MODE_PRIVATE) }
               private val ui = Handler(Looper.getMainLooper())
+              private var currentAddr: String? = null
+              private var currentProto: String? = null
 
               private var demoT = 0f
               private val demoTick = object : Runnable {
@@ -86,16 +85,24 @@ jobs:
                       demoT += 0.05f
                       val sp = (90 + 60 * sin(demoT * 0.7f) + 10 * sin(demoT * 3.1f)).coerceAtLeast(0f)
                       val rm = (sp * 45 + 800 + 300 * sin(demoT * 1.3f)).coerceAtLeast(0f)
-                      d.speed = sp.roundToInt()
-                      d.rpm = rm.roundToInt()
-                      d.temp = (88 + 3 * sin(demoT * 0.3f)).roundToInt()
-                      d.outTemp = (15 + 5 * sin(demoT * 0.2f)).roundToInt()
-                      d.fuel = (0.5f + 0.4f * sin(demoT * 0.1f)).coerceIn(0f, 1f)
-                      if (d.speed > d.maxSpeed) d.maxSpeed = d.speed
-                      d.avg = d.avg * 0.99f + d.speed * 0.01f
-                      d.trip += d.speed * 0.05f / 3600f
-                      d.gear = guessGear(d.speed, d.rpm)
-                      d.invalidate()
+                      d.targetSpeed = sp.roundToInt()
+                      d.targetRpm = rm.roundToInt()
+                      d.targetTemp = (88 + 3 * sin(demoT * 0.3f)).roundToInt()
+                      d.targetOutTemp = (15 + 5 * sin(demoT * 0.2f)).roundToInt()
+                      d.targetFuel = (0.5f + 0.4f * sin(demoT * 0.1f)).coerceIn(0f, 1f)
+                      
+                      d.temp = d.targetTemp
+                      d.outTemp = d.targetOutTemp
+                      d.fuel = d.targetFuel
+
+                      if (d.targetSpeed > d.maxSpeed) d.maxSpeed = d.targetSpeed
+                      d.avg = d.avg * 0.99f + d.targetSpeed * 0.01f
+                      d.trip += d.targetSpeed * 0.05f / 3600f
+                      val newGear = guessGear(d.targetSpeed, d.targetRpm)
+                      if (newGear != d.gear) {
+                          d.gear = newGear
+                          d.gearFlash = 1f
+                      }
                       ui.postDelayed(this, 50)
                   }
               }
@@ -117,8 +124,19 @@ jobs:
 
                       val gd = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
                           override fun onDown(e: MotionEvent) = true
-                          override fun onLongPress(e: MotionEvent) { runOnUiThread { showModeMenu() } }
-                          override fun onDoubleTap(e: MotionEvent): Boolean { runOnUiThread { chooseAndStart() }; return true }
+                          override fun onLongPress(e: MotionEvent) { 
+                              runOnUiThread { dash?.hudMode = !(dash?.hudMode ?: false); dash?.invalidate() } 
+                          }
+                          override fun onDoubleTap(e: MotionEvent): Boolean { 
+                              runOnUiThread { 
+                                  val w = dash?.width ?: return@runOnUiThread
+                                  if (e.x > w * 0.7) {
+                                      readAndClearErrors()
+                                  } else {
+                                      chooseAndStart()
+                                  }
+                              }; return true 
+                          }
                       })
                       d.setOnTouchListener { _, e -> gd.onTouchEvent(e); true }
 
@@ -132,6 +150,35 @@ jobs:
                   } catch (t: Throwable) {
                       showFatal(t)
                   }
+              }
+
+              private fun readAndClearErrors() {
+                  if (socket == null || !running) {
+                      dash?.showToast("Ошибки доступны только в реальном режиме")
+                      return
+                  }
+                  dash?.showToast("Чтение ошибок...")
+                  Thread {
+                      try {
+                          val inp = socket!!.inputStream
+                          val out = socket!!.outputStream
+                          val resp = cmd(inp, out, "03")
+                          val clean = resp.replace(Regex("\\s"), "").uppercase()
+                          
+                          ui.post {
+                              if (clean.contains("4300")) {
+                                  dash?.showToast("Ошибок нет!")
+                              } else if (clean.contains("43")) {
+                                  dash?.showToast("Найдены ошибки ЭБУ! Сброс...")
+                                  Thread { try { cmd(inp, out, "04"); ui.post { dash?.showToast("Ошибки успешно сброшены") } } catch (_: Exception) {} }.start()
+                              } else {
+                                  dash?.showToast("Не удалось прочитать ошибки")
+                              }
+                          }
+                      } catch (e: Exception) {
+                          ui.post { dash?.showToast("Ошибка связи") }
+                      }
+                  }.start()
               }
 
               private fun setupCrashHandler() {
@@ -210,6 +257,7 @@ jobs:
 
               private fun startReal(addr: String, proto: String) {
                   stopAll(); val my = ++session; running = true
+                  currentAddr = addr; currentProto = proto
                   Thread {
                       while (running && my == session) {
                           try {
@@ -239,15 +287,17 @@ jobs:
                   while (running && my == session) {
                       val v = pid(inp, out, "010D", 2); val r = pid(inp, out, "010C", 4)
                       if (v == null && r == null) { if (++noData >= 5) throw IOException("нет ответа ЭБУ") } else noData = 0
-                      v?.let { d.speed = it; if (it > d.maxSpeed) d.maxSpeed = it; if (it > 0) { sum += it; n++; d.avg = sum.toFloat() / n } }
-                      r?.let { d.rpm = it / 4 }
+                      v?.let { d.targetSpeed = it; if (it > d.maxSpeed) d.maxSpeed = it; if (it > 0) { sum += it; n++; d.avg = sum.toFloat() / n } }
+                      r?.let { d.targetRpm = it / 4 }
                       if (loop % 10 == 0) {
-                          if (fails[0] < 3) pid(inp, out, "0105", 2)?.let { d.temp = it - 40 } ?: fails[0]++
-                          if (fails[1] < 3) pid(inp, out, "010F", 2)?.let { d.outTemp = it - 40 } ?: fails[1]++
-                          if (fails[2] < 3) pid(inp, out, "012F", 2)?.let { d.fuel = it / 255f } ?: fails[2]++
+                          if (fails[0] < 3) pid(inp, out, "0105", 2)?.let { d.targetTemp = it - 40; d.temp = d.targetTemp } ?: fails[0]++
+                          if (fails[1] < 3) pid(inp, out, "010F", 2)?.let { d.targetOutTemp = it - 40; d.outTemp = d.targetOutTemp } ?: fails[1]++
+                          if (fails[2] < 3) pid(inp, out, "012F", 2)?.let { d.targetFuel = it / 255f; d.fuel = d.targetFuel } ?: fails[2]++
                       }
-                      val now = System.nanoTime(); d.trip += d.speed * ((now - last) / 1e9f) / 3600f; last = now
-                      d.gear = guessGear(d.speed, d.rpm); ui.post { d.invalidate() }; loop++
+                      val now = System.nanoTime(); d.trip += d.targetSpeed * ((now - last) / 1e9f) / 3600f; last = now
+                      val newGear = guessGear(d.targetSpeed, d.targetRpm)
+                      if (newGear != d.gear) { d.gear = newGear; d.gearFlash = 1f }
+                      ui.post { d.invalidate() }; loop++
                   }
               }
 
@@ -300,10 +350,20 @@ jobs:
           }
 
           class DashView(ctx: Context) : View(ctx) {
-              @Volatile var speed = 0; @Volatile var rpm = 0; @Volatile var temp = 0; @Volatile var maxSpeed = 0
+              // Целевые значения (куда нужно приехать)
+              @Volatile var targetSpeed = 0; @Volatile var targetRpm = 0; @Volatile var targetTemp = 0
+              @Volatile var targetOutTemp: Int? = null; @Volatile var targetFuel = -1f
+              
+              // Текущие отображаемые значения (плавно догоняют целевые)
+              @Volatile var speed = 0f; @Volatile var rpm = 0f; @Volatile var temp = 0; @Volatile var maxSpeed = 0
               @Volatile var avg = 0f; @Volatile var trip = 0f; @Volatile var gear = 0
               @Volatile var outTemp: Int? = null; @Volatile var fuel = -1f
               @Volatile var status = "Долгое нажатие — меню"
+              @Volatile var hudMode = false
+              @Volatile var gearFlash = 0f
+              @Volatile var toastMsg: String? = null
+              private var toastTime = 0L
+              private var pulse = 0f
 
               private val p = Paint(Paint.ANTI_ALIAS_FLAG)
               private val tM = Typeface.create("sans-serif-medium", Typeface.NORMAL)
@@ -324,7 +384,6 @@ jobs:
               private val coolCols = arrayOf("#1EA0FF", "#27B6FF", "#4CC9FF", "#7FDCFF", "#FF8A2A", "#FF3B2A").map { Color.parseColor(it) }.toIntArray()
               private val unlit = Color.argb(72, 70, 110, 150)
 
-              // Картинка машины
               private val car: Bitmap? by lazy {
                   try {
                       val src = BitmapFactory.decodeResource(resources, R.drawable.car, BitmapFactory.Options().apply { inScaled = false })
@@ -343,6 +402,12 @@ jobs:
               private var t0 = 0L
               private val timeFmt = SimpleDateFormat("HH:mm", Locale.getDefault())
               private val path = Path()
+
+              fun showToast(msg: String) {
+                  toastMsg = msg
+                  toastTime = System.currentTimeMillis()
+                  postInvalidate()
+              }
 
               private fun pt(color: Int, w: Float = 0f): Paint {
                   p.reset(); p.isAntiAlias = true; p.color = color
@@ -412,15 +477,7 @@ jobs:
                   val bg = pt(Color.WHITE).also { it.shader = RadialGradient(DW / 2, DH * .45f, DW * .62f, Color.parseColor("#0D1B2A"), Color.parseColor("#04070C"), Shader.TileMode.CLAMP) }
                   c.drawRoundRect(0f, 0f, DW, DH, 34f, 34f, bg)
                   dialStatic(c, spd); dialStatic(c, rpmD)
-                  
-                  // Выводим машину строго по центру доступной зоны
-                  car?.let { 
-                      val x = (DW - it.width) / 2f
-                      val topLimit = 184f
-                      val bottomLimit = 582f
-                      val y = topLimit + (bottomLimit - topLimit - it.height) / 2f
-                      c.drawBitmap(it, x, y, null) 
-                  }
+                  car?.let { c.drawBitmap(it, 650f, 240f, null) }
 
                   val pl = pt(Color.argb(140, 39, 182, 255), 2f); pl.setShadowLayer(10f, 0f, 0f, cCy)
                   path.reset(); path.moveTo(527f, 128f); path.lineTo(527f, 150f); path.quadTo(540f, 184f, 575f, 184f); path.lineTo(1340f, 184f); path.quadTo(1378f, 184f, 1390f, 150f); path.lineTo(1390f, 128f)
@@ -466,9 +523,22 @@ jobs:
               override fun onDraw(c: Canvas) {
                   try {
                       c.drawColor(Color.BLACK)
+                      if (hudMode) {
+                          c.save(); c.scale(-1f, 1f, width / 2f, height / 2f)
+                      }
                       staticBmp?.let { c.drawBitmap(it, ox, oy, null) } ?: return
                       if (t0 == 0L) t0 = System.nanoTime()
                       val t = (System.nanoTime() - t0) / 1e9f; val booting = t < 2.8f
+                      
+                      // Плавная анимация (Лерп)
+                      if (!booting) {
+                          speed += (targetSpeed - speed) * 0.15f
+                          rpm += (targetRpm - rpm) * 0.15f
+                          if (abs(speed - targetSpeed) < 0.5f) speed = targetSpeed.toFloat()
+                          if (abs(rpm - targetRpm) < 0.5f) rpm = targetRpm.toFloat()
+                      }
+                      if (gearFlash > 0f) gearFlash -= 0.05f
+                      
                       c.save(); c.translate(ox, oy); c.scale(sc, sc)
 
                       val fs: Float; val fr: Float
@@ -476,14 +546,23 @@ jobs:
                           val pr = t / 2.8f
                           fun e(x: Float) = if (x < .5f) 4 * x * x * x else 1 - Math.pow((-2 * x + 2).toDouble(), 3.0).toFloat() / 2
                           val v = if (pr < .5f) e(pr * 2) else 1 - e(pr * 2 - 1); fs = v; fr = v
-                      } else { fs = min(speed.toFloat(), spd.max) / spd.max; fr = min(rpm.toFloat(), 8000f) / 8000f }
+                      } else { fs = min(speed, spd.max) / spd.max; fr = min(rpm, 8000f) / 8000f }
+                      
                       dialDyn(c, spd, fs); dialDyn(c, rpmD, fr)
 
-                      val sp = speed; val hot = sp > 110
+                      // Пульсация красным при превышении
+                      val hot = speed > 110
+                      if (hot) {
+                          pulse += 0.1f
+                          val alpha = (127 + 127 * sin(pulse)).toInt()
+                          c.drawRoundRect(0f, 0f, DW, DH, 34f, 34f, pt(Color.argb(alpha / 3, 255, 0, 0), 12f))
+                      }
+
+                      val sp = speed.roundToInt()
                       tx(c, "КМ/Ч", spd.cx, 342f, 15f, cDim, tM, Paint.Align.CENTER)
-                      tx(c, sp.toString(), spd.cx, 432f, 96f, if (hot) cHot else cWhite, tBI, Paint.Align.CENTER)
+                      tx(c, sp.toString(), spd.cx, 432f, 96f, if (hot) Color.RED else cWhite, tBI, Paint.Align.CENTER)
                       tx(c, "КМ/Ч", spd.cx, 466f, 20f, cLight, tM, Paint.Align.CENTER)
-                      tx(c, rpm.toString(), rpmD.cx, 410f, 66f, if (rpm > 6000) cHot else cWhite, tBI, Paint.Align.CENTER)
+                      tx(c, rpm.roundToInt().toString(), rpmD.cx, 410f, 66f, if (rpm > 6000) cHot else cWhite, tBI, Paint.Align.CENTER)
                       tx(c, "об/мин", rpmD.cx, 442f, 20f, cLight, tM, Paint.Align.CENTER)
 
                       tx(c, timeFmt.format(Date()), 635f, 168f, 30f, Color.parseColor("#E8F6FF"), tM, Paint.Align.CENTER)
@@ -515,15 +594,29 @@ jobs:
                       gs.forEachIndexed { i, s ->
                           val x = 868f + i * 50f; val on = gear == i
                           if (on) {
-                              c.drawRoundRect(x - 24, 608f, x + 24, 654f, 8f, 8f, pt(Color.argb(36, 39, 182, 255)).also { it.style = Paint.Style.FILL })
+                              val flashCol = if (gearFlash > 0) Color.argb((gearFlash * 255).toInt(), 255, 255, 255) else Color.argb(36, 39, 182, 255)
+                              c.drawRoundRect(x - 24, 608f, x + 24, 654f, 8f, 8f, pt(flashCol).also { it.style = Paint.Style.FILL })
                               c.drawRoundRect(x - 24, 608f, x + 24, 654f, 8f, 8f, pt(cCy, 3f).also { it.setShadowLayer(12f, 0f, 0f, cCy) })
                           }
                           tx(c, s, x, 641f, 28f, if (on) Color.WHITE else cDim, if (on) tB else tM, Paint.Align.CENTER)
                       }
 
                       if (status.isNotEmpty()) tx(c, status, 958f, 236f, 22f, Color.parseColor("#FFD166"), tM, Paint.Align.CENTER)
+                      
+                      // Всплывающее сообщение (Toast)
+                      toastMsg?.let {
+                          if (System.currentTimeMillis() - toastTime < 3000) {
+                              p.reset(); p.color = Color.argb(200, 0, 0, 0); p.style = Paint.Style.FILL
+                              val tw = tw(it, 24f, tB) + 40f
+                              c.drawRoundRect(958f - tw/2, 400f, 958f + tw/2, 450f, 12f, 12f, p)
+                              tx(c, it, 958f, 436f, 24f, Color.WHITE, tB, Paint.Align.CENTER)
+                              postInvalidateOnAnimation()
+                          }
+                      }
+
                       c.restore()
-                      if (booting) postInvalidateOnAnimation()
+                      if (hudMode) c.restore()
+                      if (booting || hudMode || abs(speed - targetSpeed) > 1f || abs(rpm - targetRpm) > 1f || gearFlash > 0f) postInvalidateOnAnimation()
                   } catch (_: Throwable) { }
               }
           }
@@ -574,8 +667,8 @@ jobs:
                   applicationId = "com.example.dash"
                   minSdk = 21
                   targetSdk = 34
-                  versionCode = 2
-                  versionName = "2.0"
+                  versionCode = 3
+                  versionName = "3.0"
               }
               compileOptions {
                   sourceCompatibility = JavaVersion.VERSION_17
